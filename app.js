@@ -10,8 +10,19 @@ var express = require('express'),
 
 Habitat.load();
 
-var config = new Habitat();
-var server = express();
+var config = new Habitat(),
+    server = express();
+
+var cookieSession = express.cookieSession({
+  key: 'webmaker-profile.sid',
+  secret: config.get('SESSION_SECRET'),
+  cookie: {
+    // 31 days
+    maxAge: 31 * 24 * 60 * 60 * 1000,
+    secure: config.get('FORCE_SSL')
+  },
+  proxy: true
+});
 
 server.disable( 'x-powered-by' );
 server.use(express.compress());
@@ -22,18 +33,8 @@ server.use(express.urlencoded());
 server.use(express.multipart());
 
 server.use(express.cookieParser());
-server.use(express.cookieSession({
-  key: 'webmaker-profile.sid',
-  secret: 'a',
-  cookie: {
-    // 31 days
-    maxAge: 31 * 24 * 60 * 60 * 1000,
-    secure: false
-  },
-  proxy: true
-}));
 
-server.use(express.static( path.join(__dirname + '/public')));
+server.use(express.static(path.join(__dirname + '/public')));
 
 server.use(function cors( req, res, next ) {
   res.header('Access-Control-Allow-Origin', config.get('AUDIENCE'));
@@ -44,7 +45,8 @@ server.use(function cors( req, res, next ) {
 
 require('webmaker-loginapi')(server, {
   loginURL: config.get('LOGINAPI'),
-  audience: config.get('AUDIENCE')
+  audience: config.get('AUDIENCE'),
+  middleware: cookieSession
 });
 
 // ROUTES ---------------------------------------------------------------------
@@ -54,6 +56,11 @@ require('webmaker-loginapi')(server, {
 var fakeUserData = require('./db/reanimator.json');
 var db = require('./services/database').createClient(config.get('DATABASE'));
 var data = require('./services/data').createClient(config.get('MAKEAPI'));
+
+// server.options('/user-data/:username', function(req, res, next) {
+//   res.set('Allow', 'GET,POST');
+//   res.send(200,"GET,POST");
+// });
 
 server.get('/user-data/:username', function fetchDataFromDB(req, res, next) {
   db.find({ where: { userid: req.params.username }}).success(function(results) {
@@ -84,7 +91,7 @@ server.get('/user-data/:username', function fetchDataFromDB(req, res, next) {
   });
 });
 
-server.post('/user-data/:username', function (req, res, next) {
+server.post('/user-data/:username', cookieSession, function (req, res, next) {
   console.log( JSON.stringify( req.session, null, 2 ) );
   console.log( JSON.stringify( req.params, null, 2 ) );
   if (req.session.username !== req.params.username) {
