@@ -85,6 +85,13 @@ server.get('/user-data/:username', function fetchDataFromDB(req, res, next) {
 });
 
 server.post('/user-data/:username', function (req, res, next) {
+  console.log( JSON.stringify( req.session, null, 2 ) );
+  console.log( JSON.stringify( req.params, null, 2 ) );
+  if (req.session.username !== req.params.username) {
+    return res.json(401, 'Unauthorized');
+  }
+  next();
+}, function (req, res, next) {
   db.findOrCreate({ userid: req.params.username }, { data: JSON.stringify(req.body) }).success(function(result, created) {
     if (created) {
       return res.send(201);
