@@ -45,6 +45,8 @@ require('webmaker-loginapi')(server, {
   audience: config.get('AUDIENCE')
 });
 
+server.use(express.csrf());
+
 // ROUTES ---------------------------------------------------------------------
 
 // User Data
